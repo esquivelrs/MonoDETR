@@ -52,7 +52,10 @@ class Cube3DLoss(nn.module):
 
 
     def loss_dims(self, outputs, targets, indices, num_boxes):
-        # TODO: 
+        # TODO: how to get gt_poses?
+        # TODO: how to import util?
+        # TODO: how to get gt_boxes3D?
+        # TODO: What is n?
 
         # Pull off necessary information (from monodetr)
         idx = self._get_src_permutation_idx(indices)
