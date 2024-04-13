@@ -3,10 +3,10 @@ random_seed: 444
 
 dataset:
   type: &dataset_type 'KITTI'
-  root_dir: '/work3/s222962/adlcv_data/project/kitti'
+  root_dir: '/dtu/blackhole/08/193832/KITTIDataset'
   train_split: 'train'
   test_split: 'val'
-  batch_size: 4
+  batch_size: 16
   use_3d_center: True
   class_merging: False
   use_dontcare: False
@@ -119,6 +119,7 @@ trainer:
 tester:
   type: *dataset_type
   mode: single  # 'single' or 'all'; 'all' to evaluate all ckpts in the folder
+  profile: True # profile the inference time and flops or not
   checkpoint: 195  # the start ckpt epoch for 'all'
   threshold: 0.2  # confidence filter
   topk: 50
