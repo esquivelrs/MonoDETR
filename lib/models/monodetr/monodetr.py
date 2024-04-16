@@ -562,18 +562,45 @@ class ExtendedSetCriterion(SetCriterion):
     
         self.loss_map.update(
             {
-                'cbr_rpn':self.cbr_loss_rpn,
                 'cbr_2d':self.cbr_loss_2D,
                 'cbr_3d':self.cbr_loss_3D
             }
         )
-    def cbr_loss_rpn()->dict:
-        pass
     
     def cbr_loss_2D()->dict:
         pass
+    
+    def disentangled_loss(self):
+        ...
 
-    def cbr_loss_3D()->dict:
+    def get_gt_vertices(self, targets, indices):
+        # Pull off necessary GT information
+        gt_boxCenter3D = torch.cat([t['boxes3D'][:,0:2][i] for t, (_, i) in zip(targets, indices)], dim=0) # TODO: verify the dimensions here 
+        gt_boxes3D = torch.cat([t['size_3d'][i] for t, (_, i) in zip(targets, indices)], dim=0) # TODO: how to get gt_boxes3D?
+        gt_angles = torch.cat([t['angle'][i] for t, (_, i) in zip(targets, indices)], dim=0)  # TODO: how to get gt_angles?
+
+        # make the UNROTATED gt_3Dbox (X,Y,Z, l, w, h)
+        gt_box3D = torch.cat([gt_boxCenter3D, gt_boxes3D], dim=1) #TODO verify the concat dimension
+        # verify the dimensions of the gt data
+        gt_vertices = utils.get_cuboid_verts_faces(gt_box3d, gt_poses)[0]
+
+        return gt_vertices
+    def cbr_loss_3D(self, outputs, targets, indices, num_boxes)->dict:
+        # Pull off predicted dimensions
+        idx = self._get_src_permutation_idx(indices)
+        cube_dims = outputs['pred_3d_dim'][idx] # (n, 3)
+
+
+        gt_vertices - self.get_gt_vertices(targets, indices)
+        # u,v loss
+
+        # z loss
+
+        # whl loss
+
+        # rotation loss
+
+        # all loss
         pass
 
 class MLP(nn.Module):

@@ -2,10 +2,10 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from fvcore.nn import giou_loss, smooth_l1_loss
-from detectron2.layers import cat, cross_entropy, nonzero_tuple, batched_nms
+# from fvcore.nn import giou_loss, smooth_l1_loss
+# from detectron2.layers import cat, cross_entropy, nonzero_tuple, batched_nms
 
-from monoDETR import utils
+# from monoDETR import utils
 import math
 
 
@@ -73,8 +73,6 @@ class Cube3DLoss(nn.module):
 
         ## CONVERSION BETWEEN MONODETR AND CUBE-RCNN
         gt_R = self.gt_angle_to_rotation_matrix(gt_angles)
-
-
 
         ## ADOPTED FROM CUBE-RCNN
         # These are the corners which will be the target for all losses!!
