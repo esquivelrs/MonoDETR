@@ -81,7 +81,7 @@ class DepthAwareTransformer(nn.Module):
             enc_n_points=4,
             two_stage=False,
             two_stage_num_proposals=50,
-            group_num=11,
+            group_num=1,    # from 11
             use_dab=False,
             two_stage_dino=False):
 
@@ -464,13 +464,13 @@ class DepthAwareDecoderLayer(nn.Module):
         # self attention
         q = k = self.with_pos_embed(tgt, query_pos)
         
-        q_content = self.sa_qcontent_proj(q)
-        q_pos = self.sa_qpos_proj(q)
-        k_content = self.sa_kcontent_proj(k)
-        k_pos = self.sa_kpos_proj(k)
-        v = self.sa_v_proj(tgt)
-        q = q_content + q_pos
-        k = k_content + k_pos
+        # q_content = self.sa_qcontent_proj(q)      # from before: this is all commented out
+        # q_pos = self.sa_qpos_proj(q)
+        # k_content = self.sa_kcontent_proj(k)
+        # k_pos = self.sa_kpos_proj(k)
+        # v = self.sa_v_proj(tgt)
+        # q = q_content + q_pos
+        # k = k_content + k_pos
         
         q = q.transpose(0, 1)
         k = k.transpose(0, 1)
@@ -478,8 +478,8 @@ class DepthAwareDecoderLayer(nn.Module):
         num_queries = q.shape[0]
        
         if self.training:
-            num_noise = num_queries-self.group_num * 50
-            num_queries = self.group_num * 50
+            num_noise = num_queries-self.group_num * 3  # from 50
+            num_queries = self.group_num * 3    # from 50
             q_noise = q[:num_noise].repeat(1,self.group_num, 1)
             k_noise = k[:num_noise].repeat(1,self.group_num, 1)
             v_noise = v[:num_noise].repeat(1,self.group_num, 1)

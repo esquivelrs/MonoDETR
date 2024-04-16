@@ -28,30 +28,30 @@ class DepthPredictor(nn.Module):
         d_model = model_cfg["hidden_dim"]
         self.downsample = nn.Sequential(
             nn.Conv2d(d_model, d_model, kernel_size=(3, 3), stride=(2, 2), padding=1),
-            nn.GroupNorm(32, d_model))
+            nn.GroupNorm(8, d_model))   # from 32
         self.proj = nn.Sequential(
             nn.Conv2d(d_model, d_model, kernel_size=(1, 1)),
-            nn.GroupNorm(32, d_model))
+            nn.GroupNorm(8, d_model))  # from 32
         self.upsample = nn.Sequential(
             nn.Conv2d(d_model, d_model, kernel_size=(1, 1)),
-            nn.GroupNorm(32, d_model))
+            nn.GroupNorm(8, d_model))  # from 32
 
         self.depth_head = nn.Sequential(
             nn.Conv2d(d_model, d_model, kernel_size=(3, 3), padding=1),
-            nn.GroupNorm(32, num_channels=d_model),
+            nn.GroupNorm(8, num_channels=d_model), # from 32
             nn.ReLU(),
             nn.Conv2d(d_model, d_model, kernel_size=(3, 3), padding=1),
-            nn.GroupNorm(32, num_channels=d_model),
+            nn.GroupNorm(8, num_channels=d_model), # from 32
             nn.ReLU())
 
         self.depth_classifier = nn.Conv2d(d_model, depth_num_bins + 1, kernel_size=(1, 1))
 
         depth_encoder_layer = TransformerEncoderLayer(
-            d_model, nhead=8, dim_feedforward=256, dropout=0.1)
+            d_model, nhead=8, dim_feedforward=16, dropout=0.1)  # from 256
 
         self.depth_encoder = TransformerEncoder(depth_encoder_layer, 1)
 
-        self.depth_pos_embed = nn.Embedding(int(self.depth_max) + 1, 256)
+        self.depth_pos_embed = nn.Embedding(int(self.depth_max) + 1, 16)    # from 256
 
     def forward(self, feature, mask, pos):
        

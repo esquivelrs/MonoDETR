@@ -5,7 +5,8 @@ from torch import nn
 from fvcore.nn import giou_loss, smooth_l1_loss
 from detectron2.layers import cat, cross_entropy, nonzero_tuple, batched_nms
 
-from cubercnn import util
+from monoDETR import utils
+import math
 
 
 class Cube2DLoss(nn.module):
@@ -47,36 +48,43 @@ class Cube3DLoss(nn.module):
         gt_box3d = torch.cat((gt_3d, gt_dims), dim=1)
 
         # These are the corners which will be the target for all losses!!
-        gt_corners = util.get_cuboid_verts_faces(gt_box3d, gt_poses)[0]
+        gt_corners = utils.get_cuboid_verts_faces(gt_box3d, gt_poses)[0]
         return gt_3d, gt_corners
+    
+    def gt_angle_to_rotation_matrix(self, gt_angles):
+
+
+        gt_R = 
+        return gt_R
 
 
     def loss_dims(self, outputs, targets, indices, num_boxes):
-        # TODO: how to get gt_poses?
-        # TODO: how to import util?
-        # TODO: how to get gt_boxes3D?
-        # TODO: What is n?
 
-        # Pull off necessary information (from monodetr)
-        idx = self._get_src_permutation_idx(indices)
-        src_dims = outputs['pred_3d_dim'][idx]
-        target_dims = torch.cat([t['size_3d'][i] for t, (_, i) in zip(targets, indices)], dim=0)
-
-
+        ## FROM MONODETR ##
         # Pull off predicted dimensions
         idx = self._get_src_permutation_idx(indices)
-        cube_dims = outputs['pred_3d_dim'][idx]
+        cube_dims = outputs['pred_3d_dim'][idx] # (n, 3)
 
         # Pull off necessary GT information
-        gt_boxes3D = torch.cat([t['size_3d'][i] for t, (_, i) in zip(targets, indices)], dim=0)
+        gt_boxes3D = torch.cat([t['size_3d'][i] for t, (_, i) in zip(targets, indices)], dim=0) # TODO: how to get gt_boxes3D?
+
+        gt_angles = torch.cat([t['angle'][i] for t, (_, i) in zip(targets, indices)], dim=0)  # TODO: how to get gt_angles?
+
+
+        ## CONVERSION BETWEEN MONODETR AND CUBE-RCNN
+        gt_R = self.gt_angle_to_rotation_matrix(gt_angles)
+
+
+
+        ## ADOPTED FROM CUBE-RCNN
         # These are the corners which will be the target for all losses!!
         gt_3d, gt_corners = self.calculate_gt_corners(gt_boxes3D, gt_poses)
 
         # Get the dimensions
-        dis_dims_corners = util.get_cuboid_verts_faces(torch.cat((gt_3d, cube_dims), dim=1), gt_poses)[0]
+        dis_dims_corners = utils.get_cuboid_verts_faces(torch.cat((gt_3d, cube_dims), dim=1), gt_poses)[0]
 
         # Calculate the loss
-        loss_dims = self.l1_loss(dis_dims_corners, gt_corners).contiguous().view(n, -1).mean(dim=1)
+        loss_dims = self.l1_loss(dis_dims_corners, gt_corners)
         pass
 
     def loss_pose(self, outputs, targets, indices, num_boxes):

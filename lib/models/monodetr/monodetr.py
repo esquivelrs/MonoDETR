@@ -83,12 +83,12 @@ class MonoDETR(nn.Module):
                 in_channels = backbone.num_channels[_]
                 input_proj_list.append(nn.Sequential(
                     nn.Conv2d(in_channels, hidden_dim, kernel_size=1),
-                    nn.GroupNorm(32, hidden_dim),
+                    nn.GroupNorm(8, hidden_dim),   # changed from 32
                 ))
             for _ in range(num_feature_levels - num_backbone_outs):
                 input_proj_list.append(nn.Sequential(
                     nn.Conv2d(in_channels, hidden_dim, kernel_size=3, stride=2, padding=1),
-                    nn.GroupNorm(32, hidden_dim),
+                    nn.GroupNorm(8, hidden_dim),   # changed from 32
                 ))
                 in_channels = hidden_dim
             self.input_proj = nn.ModuleList(input_proj_list)
@@ -96,7 +96,7 @@ class MonoDETR(nn.Module):
             self.input_proj = nn.ModuleList([
                 nn.Sequential(
                     nn.Conv2d(backbone.num_channels[0], hidden_dim, kernel_size=1),
-                    nn.GroupNorm(32, hidden_dim),
+                    nn.GroupNorm(8, hidden_dim),   # changed from 32
                 )])
         
         self.backbone = backbone
