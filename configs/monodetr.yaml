@@ -3,10 +3,10 @@ random_seed: 444
 
 dataset:
   type: &dataset_type 'KITTI'
-  root_dir: '/work3/s222962/adlcv_data/project/kitti'
+  root_dir: './data/KITTIDataset_reduced'
   train_split: 'train'
   test_split: 'val'
-  batch_size: 4
+  batch_size: 2
   use_3d_center: True
   class_merging: False
   use_dontcare: False
@@ -53,13 +53,13 @@ model:
   use_dn: False
   two_stage_dino: False
   init_box: False
-  enc_layers: 3
-  dec_layers: 3
+  enc_layers: 2
+  dec_layers: 2
   hidden_dim: 256
   dim_feedforward: 256
   dropout: 0.1
   nheads: 8
-  num_queries: 50
+  num_queries: 25
   enc_n_points: 4
   dec_n_points: 4
   # DN
@@ -81,6 +81,9 @@ model:
   angle_loss_coef: 1
   depth_loss_coef: 1
   depth_map_loss_coef: 1
+
+  # loss coeff for cuberncc losses
+  cbr_3d_loss_coef: 10
 
   # Matcher
   set_cost_class: 2
