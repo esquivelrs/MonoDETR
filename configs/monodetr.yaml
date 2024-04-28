@@ -87,7 +87,12 @@ model:
   depth_map_loss_coef: 1
 
   # loss coeff for cuberncc losses
-  cbr_3d_loss_coef: 0
+  cbr_loss_depth_coef: 1
+  cbr_loss_xy_coef: 1
+  cbr_loss_dims_coef: 1
+  cbr_loss_ry_coef: 1
+  cbr_loss_all_coef: 1
+  # cbr_3d_loss_coef: 0
 
   # Matcher
   set_cost_class: 2
