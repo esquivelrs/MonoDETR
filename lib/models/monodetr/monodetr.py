@@ -6,13 +6,18 @@ import torch.nn.functional as F
 from torch import nn
 import math
 import copy
+import os
+import cv2 as cv
 
 from typing import List
-from utils import box_ops
+from utils import box_ops, draw3Dbox2img
 from utils.misc import (NestedTensor, nested_tensor_from_tensor_list,
                             accuracy, get_world_size, interpolate,
                             is_dist_avail_and_initialized, inverse_sigmoid)
 
+import utils.draw3Dbox2img as viz_utils
+
+from .utils_cubercnn import box_utils
 from .utils_cubercnn.box_utils import generate_corners3d, get_heading_angle, alpha2ry, chamfer_loss
 
 from .backbone import build_backbone
@@ -22,6 +27,8 @@ from .depth_predictor import DepthPredictor
 from .depth_predictor.ddn_loss import DDNLoss
 from lib.losses.focal_loss import sigmoid_focal_loss
 from .dn_components import prepare_for_dn, dn_post_process, compute_dn_loss
+
+from lib.datasets.kitti.kitti_utils import Calibration, draw_projected_box3d
 
 
 def _get_clones(module, N):
@@ -592,55 +599,71 @@ class ExtendedSetCriterion(SetCriterion):
         # target's variables, matching the size of the batch indices
 
         # Constructing Gt 3d corners
-        target_3d_center_xy = torch.cat([t['boxes_3d'][:, 0: 2][i] for t, (_, i) in zip(targets, indices)], dim=0)
+        target_3d_center_cxcy = torch.cat([t['boxes_3d'][:, 0: 2][i] for t, (_, i) in zip(targets, indices)], dim=0)
         target_depth = torch.cat([t['depth'][i] for t, (_, i) in zip(targets, indices)], dim=0)
         target_3d_dims = torch.cat([t['size_3d'][i] for t, (_, i) in zip(targets, indices)], dim=0) # makes a single tensor for all targets in the batch
         target_ry = torch.cat([t['ry'][i] for t, (_, i) in zip(targets, indices)], dim=0)
         target_img_size = torch.cat([t['img_size_repeat'][i] for t, (_, i) in zip(targets, indices)], dim=0)
-        target_calibs = torch.cat([t['calibs'][i] for t, (_, i) in zip(targets, indices)], dim=0)
+        target_calib_P2 = torch.cat([t['calibs'][i] for t, (_, i) in zip(targets, indices)], dim=0)
 
-        gt_vertices = generate_corners3d(target_3d_dims, target_ry, target_3d_center_xy, target_depth)
+        # _train_root_path = '/home/iony/DTU/s24/adlcv/project/adlcv_project/models/monoDETR/data/KITTIDataset_reduced/training/'
+        # target_calibs = viz_utils.get_calibs(_train_root_path, targets_info['img_id'])
+
+        # img to camera coordinates for all target (matrix form)
+        target_cucv = target_3d_center_cxcy*target_img_size
+        _cus = target_calib_P2[:,0,2]
+        _cvs = target_calib_P2[:,1,2]
+        _fus = target_calib_P2[:,0,0]
+        _fvs = target_calib_P2[:,1,2]
+        _txs = target_calib_P2[:,0,3] / (-_fus)
+        _tys = target_calib_P2[:,1,3] / (-_fvs)
+
+        _xs3d = (target_cucv[:,0]-_cus).unsqueeze(-1) * target_depth / _fus.unsqueeze(-1) + _txs.unsqueeze(-1)
+        _ys3d = (target_cucv[:,1]-_cvs).unsqueeze(-1) * target_depth / _fvs.unsqueeze(-1) + _tys.unsqueeze(-1)
+        _xys3d = torch.stack((_xs3d, _ys3d),dim=1).squeeze()
+        
+        target_corners3d, _ = generate_corners3d(target_3d_dims, target_ry, _xys3d, target_depth)
 
         # predicted 3d dimensions
         pred_matched_idxs = self._get_src_permutation_idx(indices) # prediction idxs matched to targets
 
         # z loss
         pred_depth = outputs['pred_depth'][:, :, 0][pred_matched_idxs].unsqueeze(dim=1)
-        pred_depth_vertices = generate_corners3d(target_3d_dims, target_ry, target_3d_center_xy, pred_depth)
+        pred_depth_vertices, _ = generate_corners3d(target_3d_dims, target_ry, _xys3d, pred_depth)
 
-        loss_depth = F.l1_loss(gt_vertices, pred_depth_vertices, reduction='none').sum()
+        loss_depth = F.l1_loss(target_corners3d, pred_depth_vertices, reduction='none').sum()
         loss_depth /= num_boxes
 
         # u,v loss
         pred_out_bbox = outputs['pred_boxes'][pred_matched_idxs] # cxcylrtb
 
         # adapted from kitti_utils.Calibration
-        _fu = target_calibs[:, 0, 0]
-        _fv = target_calibs[:, 1, 1]
-        _cu = target_calibs[:, 0, 2]
-        _cv = target_calibs[:, 1, 2]
-        _tx = target_calibs[:, 0, 3] / _fu
-        _ty = target_calibs[:, 1, 3] / _fv
+        _fu = target_calib_P2[:, 0, 0]
+        _fv = target_calib_P2[:, 1, 1]
+        _cu = target_calib_P2[:, 0, 2]
+        _cv = target_calib_P2[:, 1, 2]
+        _tx = target_calib_P2[:, 0, 3] / _fu
+        _ty = target_calib_P2[:, 1, 3] / _fv
 
         # scale normalized u,v to image size
         _u = pred_out_bbox[:, 0] * target_img_size[:,0]
         _v = pred_out_bbox[:, 1] * target_img_size[:,1]
 
         # project to 3d (camera coordinates)
-        _x = ((_u-_cu)*target_depth.squeeze() / _fu ) + _tx
-        _y = ((_v-_cv)*target_depth.squeeze() / _fv) + _ty
+        _x3D = ((_u-_cu)*target_depth.squeeze() / _fu ) + _tx
+        _y3D = ((_v-_cv)*target_depth.squeeze() / _fv) + _ty
 
-        pred_3d_center_xy = torch.cat((_x.reshape(-1, 1), _y.reshape(-1, 1)), dim=1)
-        pred_xy_vertices = generate_corners3d(target_3d_dims, target_ry, pred_3d_center_xy, target_depth)
+        pred_3d_center_xy = torch.cat((_x3D.reshape(-1, 1), _y3D.reshape(-1, 1)), dim=1)
+        pred_xy_vertices, _ = generate_corners3d(target_3d_dims, target_ry, pred_3d_center_xy, target_depth)
 
-        loss_xy = F.l1_loss(gt_vertices, pred_xy_vertices, reduction='none').sum()
+        loss_xy = F.l1_loss(target_corners3d, pred_xy_vertices, reduction='none').sum()
         loss_xy /= num_boxes
 
         # whl loss
         pred_3d_dims = outputs['pred_3d_dim'][pred_matched_idxs] # whl
-        pred_dims_vertices = generate_corners3d(pred_3d_dims, target_ry, target_3d_center_xy, target_depth)
+        pred_dims_vertices, _ = generate_corners3d(pred_3d_dims, target_ry, target_3d_center_cxcy, target_depth)
 
-        loss_dims = F.l1_loss(gt_vertices, pred_dims_vertices, reduction='none').sum()
+        loss_dims = F.l1_loss(target_corners3d, pred_dims_vertices, reduction='none').sum()
         loss_dims /= num_boxes
 
         pred_heading = outputs['pred_angle'][pred_matched_idxs] # size 24: 12 for classification, 12 for residual
@@ -649,14 +672,14 @@ class ExtendedSetCriterion(SetCriterion):
             # rotation loss
             alpha = torch.cat([i.reshape(1,) for i in map(get_heading_angle, pred_heading)], dim=0)
             pred_ry = torch.cat([i.reshape(1,) for i in map(alpha2ry, alpha, _u, _cu, _fu)], dim=0)
-            pred_ry_vertices = generate_corners3d(target_3d_dims, pred_ry, target_3d_center_xy, target_depth)
+            pred_ry_vertices, U = generate_corners3d(target_3d_dims, pred_ry, target_3d_center_cxcy, target_depth)
 
-            loss_ry = chamfer_loss(gt_vertices, pred_ry_vertices).sum()
+            loss_ry = chamfer_loss(target_corners3d, pred_ry_vertices).sum()
             loss_ry /= num_boxes
 
             # entangled ('all') loss
-            pred_vertices = generate_corners3d(pred_3d_dims, pred_ry, pred_3d_center_xy, pred_depth)
-            loss_all = chamfer_loss(gt_vertices, pred_vertices).sum()
+            pred_vertices, _ = generate_corners3d(pred_3d_dims, pred_ry, pred_3d_center_xy, pred_depth)
+            loss_all = chamfer_loss(target_corners3d, pred_vertices).sum()
             loss_all /= num_boxes
         else:
             loss_ry = 0

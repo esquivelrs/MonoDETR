@@ -11,7 +11,7 @@
             "program": "tools/train_val.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
-            "args": "--config configs/monodetr.yaml"
+            "args": "model_name='debug'"
         }
     ]
 }
