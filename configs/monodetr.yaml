@@ -4,10 +4,10 @@ evaluate_only: False
 
 dataset:
   type: &dataset_type 'KITTI'
-  root_dir: '/dtu/blackhole/08/193832/KITTIDataset'
+  root_dir: '/home/iony/DTU/s24/adlcv/project/adlcv_project/models/monoDETR/data/KITTIDataset_reduced'
   train_split: 'train'
   test_split: 'val'
-  batch_size: 16
+  batch_size: 2
   use_3d_center: True
   class_merging: False
   use_dontcare: False
@@ -119,7 +119,7 @@ trainer:
   save_frequency: 1  # checkpoint save interval (in epoch)
   # resume_model: True
   # pretrain_model: path/to/ckpt
-  save_path: '/dtu/blackhole/08/193832'
+  save_path: '/home/iony/DTU/s24/adlcv/project/adlcv_project/models/monoDETR  /output'
   save_all: False  # False for only savng the best and latest ckpts
   use_dn: False
   scalar: 5

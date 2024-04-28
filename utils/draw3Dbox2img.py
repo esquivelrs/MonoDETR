@@ -9,7 +9,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(ROOT_DIR)
 
-from lib.datasets.kitti.kitti_utils import Calibration_draw, draw_projected_box3d
+from lib.datasets.kitti.kitti_utils import Calibration, Calibration_draw, draw_projected_box3d
 
        
 def compute_3d_box_cam(h, w, l, x, y, z, yaw):
@@ -44,15 +44,21 @@ def read_detection(path, is_gt=False):
     return df
 
 
-def get_data(curr_path, img_id):
-    path_img = os.path.join(curr_path, '../data/image_2/%06d.png'%img_id)
+def get_calibs(data_path, img_ids)->Calibration:
 
-    calib = Calibration_draw(os.path.join(curr_path, '../data/calib/%06d.txt'%img_id))
-    ground_truth = read_detection(os.path.join(curr_path, '../data/label_2/%06d.txt'%img_id), is_gt=True)
-    predicted = read_detection(os.path.join(curr_path, '../outputs/monodetr/%06d.txt'%img_id), is_gt=False)
-    return calib, path_img, ground_truth, predicted
+    return [Calibration(os.path.join(data_path, 'calib/%06d.txt'%img_id)) for img_id in img_ids]
 
+def get_data(data_path, img_id, output_path=None, return_pred=False):
+    path_img = os.path.join(data_path, 'image_2/%06d.png'%img_id)
 
+    calib_draw = Calibration_draw(os.path.join(data_path, 'calib/%06d.txt'%img_id))
+    ground_truth = read_detection(os.path.join(data_path, 'label_2/%06d.txt'%img_id), is_gt=True)
+
+    predicted = []
+    if return_pred:
+        predicted = read_detection(os.path.join(output_path, '/%06d.txt'%img_id), is_gt=False)
+
+    return calib_draw, path_img, ground_truth, predicted
 
 
 def plot_2d(path_img, df, gt, calib):
@@ -65,21 +71,18 @@ def plot_2d(path_img, df, gt, calib):
     for o in range(len(gt)):
         corners_3d = compute_3d_box_cam(*gt.loc[o, ['height', 'width', 'length', 'pos_x', 'pos_y', 'pos_z', 'rot_y']])
         pts_2d = calib.project_rect_to_image(corners_3d.T)
-        image_gt = draw_projected_box3d(image, pts_2d, color=(0,255,0), thickness=1)
+        image_annotated = draw_projected_box3d(image, pts_2d, color=(0,255,0), thickness=1)
 
     # Plot the projected 3D bounding boxes on the image
     for o in range(len(df)):
         corners_3d = compute_3d_box_cam(*df.loc[o, ['height', 'width', 'length', 'pos_x', 'pos_y', 'pos_z', 'rot_y']])
         pts_2d = calib.project_rect_to_image(corners_3d.T)
-        image_dt = draw_projected_box3d(image_gt, pts_2d, color=(255,0,255), thickness=1)
+        image_annotated = draw_projected_box3d(image_annotated, pts_2d, color=(255,0,255), thickness=1)
 
     img_id = path_img.split('/')[-1].split('.')[0]
     save_path = os.path.join(ROOT_DIR, 'outputs', 'monodetr')
     print(save_path)
-    cv2.imwrite(os.path.join(save_path, f'{img_id}_2d.png'), image_dt)
-
-
-
+    cv2.imwrite(os.path.join(save_path, f'{img_id}_2d.png'), image_annotated)
 
 
 def transform_coordinates(points):

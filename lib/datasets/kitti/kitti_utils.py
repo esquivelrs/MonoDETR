@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+import torch
 
 from typing import List
 
@@ -199,7 +200,7 @@ class Calibration(object):
         pts_img, pts_depth = self.rect_to_img(pts_rect)
         return pts_img, pts_depth
 
-    def img_to_rect(self, u, v, depth_rect):
+    def img_to_rect(self, u, v, depth_rect, return_type='numpy'):
         """
         :param u: (N)
         :param v: (N)
@@ -208,7 +209,11 @@ class Calibration(object):
         """
         x = ((u - self.cu) * depth_rect) / self.fu + self.tx
         y = ((v - self.cv) * depth_rect) / self.fv + self.ty
-        pts_rect = np.concatenate((x.reshape(-1, 1), y.reshape(-1, 1), depth_rect.reshape(-1, 1)), axis=1)
+        if return_type == 'torch':
+            pts_rect = torch.stack((x, y, depth_rect), dim=1)
+        else:
+            pts_rect = np.concatenate((x.reshape(-1, 1), y.reshape(-1, 1), depth_rect.reshape(-1, 1)), axis=1)
+
         return pts_rect
 
     def depthmap_to_rect(self, depth_map):
