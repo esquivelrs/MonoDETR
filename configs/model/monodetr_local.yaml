@@ -57,8 +57,8 @@ model:
   use_dn: False
   two_stage_dino: False
   init_box: False
-  enc_layers: 3
-  dec_layers: 3
+  enc_layers: 2
+  dec_layers: 2
   hidden_dim: 256
   dim_feedforward: 256
   dropout: 0.1
@@ -87,7 +87,12 @@ model:
   depth_map_loss_coef: 1
 
   # loss coeff for cuberncc losses
-  cbr_3d_loss_coef: 0
+  cbr_loss_depth_coef: 1
+  cbr_loss_xy_coef: 1
+  cbr_loss_dims_coef: 1
+  cbr_loss_ry_coef: 1
+  cbr_loss_all_coef: 1
+  # cbr_3d_loss_coef: 0
 
   # Matcher
   set_cost_class: 2
